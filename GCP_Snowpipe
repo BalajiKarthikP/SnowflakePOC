@@ -126,3 +126,5 @@ select * from FRUITS_V_MODEL1_SCD1
 --https://quickstarts.snowflake.com/guide/getting_started_with_snowpipe/index.html?index=..%2F..index#0
 
 --https://quickstarts.snowflake.com/guide/CDC_SnowpipeStreaming_DynamicTables/index.html?index=..%2F..index#5
+Step by Step video
+--https://youtu.be/TVMd_MG_vJ8?si=bpokqQNoe54wwZEk
