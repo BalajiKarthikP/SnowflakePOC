@@ -15,7 +15,7 @@ create or replace storage integration gcs_snowpipe
  
 -- Describe storage integration to get service account name
   desc storage integration gcs_snowpipe;
-  --ozwycizigd@gcpeuropewest4-1-88d1.iam.gserviceaccount.com
+
 
 -- Create external stage to gcs bucket
 --Definition :Snowflake Stages are locations where data files are stored for loading and unloading data
@@ -40,9 +40,6 @@ GCP_PUBSUB_SUBSCRIPTION_NAME = 'projects/earnest-vent-410010/subscriptions/snowp
 --Describe Notification Integration
 
 DESC NOTIFICATION INTEGRATION notification_snowflake;
-
---olewdcajwp@gcpeuropewest4-1-88d1.iam.gserviceaccount.com
-
 
 
 -- Create pipe
@@ -118,3 +115,14 @@ SELECT
 
 -- Select Dynamic Table
 select * from FRUITS_V_MODEL1_SCD1
+
+--- Show Refresh History , Lineage of Dynamic Tables
+
+
+--Documentation
+
+--https://docs.snowflake.com/en/user-guide/data-load-snowpipe-auto-gcs
+
+--https://quickstarts.snowflake.com/guide/getting_started_with_snowpipe/index.html?index=..%2F..index#0
+
+--https://quickstarts.snowflake.com/guide/CDC_SnowpipeStreaming_DynamicTables/index.html?index=..%2F..index#5
