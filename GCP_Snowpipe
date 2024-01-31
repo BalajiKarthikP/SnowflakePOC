@@ -1,0 +1,120 @@
+use role accountadmin;
+ 
+-- Create raw_model0 table to store JSON messages/events
+create or replace table raw_model0 (file_name varchar(100),file_row_number integer, file_hash_value varchar(100) ,file_last_modified timestamp,file_start_scan_time timestamp,message variant );
+ 
+-- Create Storage Integration 
+--Definition : A storage integration is a Snowflake object that stores a generated identity and access management (IAM) entity for your external cloud storage
+
+create or replace storage integration gcs_snowpipe
+ 
+  TYPE = EXTERNAL_STAGE
+  STORAGE_PROVIDER = 'GCS'
+  ENABLED = TRUE
+  STORAGE_ALLOWED_LOCATIONS = ('gcs://snowpipedemobt/');
+ 
+-- Describe storage integration to get service account name
+  desc storage integration gcs_snowpipe;
+  --ozwycizigd@gcpeuropewest4-1-88d1.iam.gserviceaccount.com
+
+-- Create external stage to gcs bucket
+--Definition :Snowflake Stages are locations where data files are stored for loading and unloading data
+  create or replace stage gcs_stage_snowpipe
+     url = 'gcs://snowpipedemobt/'
+     storage_integration = gcs_snowpipe;
+
+-- Validate if external stage is created
+     show stages; 
+-- List files in stage
+     list @gcs_stage_snowpipe;
+
+
+--Create Notification Integration
+--Definition : A notification integration is a Snowflake object that provides an interface between Snowflake and third-party messaging services
+ create or replace notification integration notification_snowflake
+type = queue
+notification_provider = GCP_PUBSUB
+ENABLED = TRUE
+GCP_PUBSUB_SUBSCRIPTION_NAME = 'projects/earnest-vent-410010/subscriptions/snowpipedemobtsubscription';
+
+--Describe Notification Integration
+
+DESC NOTIFICATION INTEGRATION notification_snowflake;
+
+--olewdcajwp@gcpeuropewest4-1-88d1.iam.gserviceaccount.com
+
+
+
+-- Create pipe
+--Definition :A pipe is a named, first-class Snowflake object that contains a COPY statement used by Snowpipe
+
+create or replace pipe gcs_snowpipe_json
+    auto_ingest = true
+    integration = notification_snowflake
+    as 
+    copy into 
+        tryout.public.raw_model0 (file_name,file_row_number, file_hash_value,file_last_modified ,file_start_scan_time ,message)
+            from (
+                select  METADATA$FILENAME, METADATA$FILE_ROW_NUMBER, METADATA$FILE_CONTENT_KEY, METADATA$FILE_LAST_MODIFIED, METADATA$START_SCAN_TIME,t.$1 
+                    from @gcs_stage_snowpipe t)
+                        file_format = (type = 'JSON');
+
+
+--Describe pipe
+desc pipe gcs_snowpipe_json;
+     
+--List pipes
+show pipes;
+ 
+--Check status of the pipe
+ 
+select system$pipe_status('gcs_snowpipe_json');
+ 
+-- Check the copy history status of the table raw_model0
+ 
+select * from table (information_schema.copy_history(table_name=>'raw_model0',start_time=>dateadd(hours, -72, current_timestamp())));
+
+--- Select the raw_model0 table
+select file_name,
+    file_row_number, 
+    file_hash_value, 
+    CONVERT_TIMEZONE('Europe/Paris', file_last_modified) AS file_last_modified,
+    CONVERT_TIMEZONE('Europe/Paris', file_start_scan_time) AS file_start_scan_time,
+    message
+from raw_model0;
+
+
+--Create Dynamic Table
+--Definition: Snowflake Dynamic Tables are a special type of table in Snowflake that are used to simplify data transformation pipelines
+
+ CREATE OR REPLACE DYNAMIC TABLE FRUITS_V_MODEL1_SCD1
+  TARGET_LAG='1 MINUTE'
+  WAREHOUSE=COMPUTE_WH
+AS
+SELECT 
+    'RETAIL' ||'&' || fruit_name AS  MSTR_SRC_STM_KEY ,
+    FRUIT_NAME AS FRUIT ,
+    colour_name AS COLOUR,
+    SIZE_NAME AS SIZE,
+    file_last_modified as VLD_FRM_TIMESTAMP,
+   CONVERT_TIMEZONE('Europe/Paris', current_timestamp())  AS INSERT_TIMESTAMP
+
+        FROM
+(SELECT 
+    inter.color as colour_name,
+    inter.fruit as fruit_name ,
+    inter.size as size_name ,
+    ROW_NUMBER() OVER (PARTITION BY FRUIT_NAME order by file_last_modified desc  ) RN,
+    file_last_modified
+    FROM 
+    (select 
+        message:color::string as color,
+        message:fruit::string as fruit,
+        message:size::string as size  ,
+        file_last_modified
+        from raw_model0) as inter
+      ) AS TEMP where rn=1;
+
+
+-- Select Dynamic Table
+select * from FRUITS_V_MODEL1_SCD1
